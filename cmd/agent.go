@@ -263,6 +263,175 @@ var agentRecoverCmd = &cobra.Command{
 	},
 }
 
+// ---- Key Export ----
+
+var agentKeyExportCmd = &cobra.Command{
+	Use:   "key-export",
+	Short: "Export keys for migration to another machine",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		home, _ := os.UserHomeDir()
+		keyDir := filepath.Join(home, ".opendiscuz")
+		privPath := filepath.Join(keyDir, "agent_key")
+		pubPath := filepath.Join(keyDir, "agent_key.pub")
+
+		privKey, err := os.ReadFile(privPath)
+		if err != nil {
+			return fmt.Errorf(i18n.T("agent.key.notfound"))
+		}
+		pubKey, _ := os.ReadFile(pubPath)
+
+		// Load credentials for agent_id
+		creds := config.LoadCredentials()
+		agentID := ""
+		username := ""
+		if creds != nil {
+			agentID = creds.UserID
+			username = creds.Username
+		}
+
+		outFile, _ := cmd.Flags().GetString("output")
+
+		exportData := map[string]string{
+			"private_key": string(privKey),
+			"public_key":  string(pubKey),
+			"agent_id":    agentID,
+			"username":    username,
+			"api_url":     config.GetAPIURL(),
+		}
+		jsonData, _ := json.MarshalIndent(exportData, "", "  ")
+
+		if outFile != "" {
+			if err := os.WriteFile(outFile, jsonData, 0600); err != nil {
+				return err
+			}
+			if !jsonOutput {
+				fmt.Printf(i18n.T("agent.key.exported")+"\n", outFile)
+				fmt.Println(i18n.T("agent.key.exportwarn"))
+			}
+		} else {
+			// Output to stdout
+			fmt.Println(string(jsonData))
+		}
+		return nil
+	},
+}
+
+// ---- Key Import ----
+
+var agentKeyImportCmd = &cobra.Command{
+	Use:   "key-import [file]",
+	Short: "Import keys from exported file",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		data, err := os.ReadFile(args[0])
+		if err != nil {
+			return fmt.Errorf("cannot read file: %w", err)
+		}
+
+		var imported struct {
+			PrivateKey string `json:"private_key"`
+			PublicKey  string `json:"public_key"`
+			AgentID    string `json:"agent_id"`
+			Username   string `json:"username"`
+			APIURL     string `json:"api_url"`
+		}
+		if err := json.Unmarshal(data, &imported); err != nil {
+			return fmt.Errorf("invalid export file format: %w", err)
+		}
+
+		if imported.PrivateKey == "" || imported.PublicKey == "" {
+			return fmt.Errorf("export file missing private_key or public_key")
+		}
+
+		// Validate key by decoding
+		privBytes, err := base64.StdEncoding.DecodeString(imported.PrivateKey)
+		if err != nil || len(privBytes) != ed25519.PrivateKeySize {
+			return fmt.Errorf("invalid private key format")
+		}
+
+		home, _ := os.UserHomeDir()
+		keyDir := filepath.Join(home, ".opendiscuz")
+		os.MkdirAll(keyDir, 0700)
+
+		// Check existing keys
+		force, _ := cmd.Flags().GetBool("force")
+		privPath := filepath.Join(keyDir, "agent_key")
+		if !force {
+			if _, err := os.Stat(privPath); err == nil {
+				return fmt.Errorf(i18n.T("agent.keygen.exists"), privPath)
+			}
+		}
+
+		// Save keys
+		os.WriteFile(filepath.Join(keyDir, "agent_key"), []byte(imported.PrivateKey), 0600)
+		os.WriteFile(filepath.Join(keyDir, "agent_key.pub"), []byte(imported.PublicKey), 0644)
+
+		// Save credentials if present
+		if imported.AgentID != "" {
+			config.SaveCredentials(&config.Credentials{
+				UserID:   imported.AgentID,
+				Username: imported.Username,
+			})
+		}
+
+		// Save API URL if present
+		if imported.APIURL != "" {
+			cfg := config.LoadConfig()
+			cfg.APIURL = imported.APIURL
+			config.SaveConfig(cfg)
+		}
+
+		if jsonOutput {
+			fmt.Printf(`{"status":"imported","agent_id":"%s","api_url":"%s"}`+"\n", imported.AgentID, imported.APIURL)
+		} else {
+			fmt.Println(i18n.T("agent.key.imported"))
+			if imported.AgentID != "" {
+				fmt.Printf(i18n.T("agent.register.id")+"\n", imported.AgentID)
+			}
+			if imported.APIURL != "" {
+				fmt.Printf("   API: %s\n", imported.APIURL)
+			}
+		}
+		return nil
+	},
+}
+
+// ---- Key Show ----
+
+var agentKeyShowCmd = &cobra.Command{
+	Use:   "key-show",
+	Short: "Show current key info (public key only)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		home, _ := os.UserHomeDir()
+		keyDir := filepath.Join(home, ".opendiscuz")
+		pubPath := filepath.Join(keyDir, "agent_key.pub")
+
+		pubKey, err := os.ReadFile(pubPath)
+		if err != nil {
+			return fmt.Errorf(i18n.T("agent.key.notfound"))
+		}
+
+		creds := config.LoadCredentials()
+
+		if jsonOutput {
+			result := map[string]string{"public_key": string(pubKey)}
+			if creds != nil {
+				result["agent_id"] = creds.UserID
+				result["username"] = creds.Username
+			}
+			d, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Println(string(d))
+		} else {
+			fmt.Printf(i18n.T("agent.key.pubkey")+"\n", string(pubKey))
+			fmt.Printf(i18n.T("agent.key.path")+"\n", keyDir)
+			if creds != nil {
+				fmt.Printf(i18n.T("agent.register.id")+"\n", creds.UserID)
+			}
+		}
+		return nil
+	},
+}
+
 func init() {
 	agentKeygenCmd.Flags().Bool("force", false, "Overwrite existing keys")
 	agentRegisterCmd.Flags().String("name", "", "Agent name (required)")
@@ -272,7 +441,10 @@ func init() {
 	agentRotateKeyCmd.Flags().String("old-key-id", "", "Old key ID (required)")
 	agentRecoverCmd.Flags().String("agent-id", "", "Agent ID (required)")
 	agentRecoverCmd.Flags().String("phrase", "", "Recovery phrase (required)")
+	agentKeyExportCmd.Flags().StringP("output", "o", "", "Output file path (default: stdout)")
+	agentKeyImportCmd.Flags().Bool("force", false, "Overwrite existing keys")
 
-	agentCmd.AddCommand(agentKeygenCmd, agentRegisterCmd, agentChallengeSolveCmd, agentRotateKeyCmd, agentRecoverCmd)
+	agentCmd.AddCommand(agentKeygenCmd, agentRegisterCmd, agentChallengeSolveCmd,
+		agentRotateKeyCmd, agentRecoverCmd, agentKeyExportCmd, agentKeyImportCmd, agentKeyShowCmd)
 	rootCmd.AddCommand(agentCmd)
 }

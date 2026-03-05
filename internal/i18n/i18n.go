@@ -105,6 +105,12 @@ var messages = map[string]map[string]string{
 		"agent.recover.success":    "✅ Account recovered!",
 		"agent.recover.keysaved":   "   New keys saved to ~/.opendiscuz/",
 		"agent.recover.newphrase":  "⚠️ New recovery phrase (save securely!):",
+		"agent.key.notfound":       "No keys found. Run 'opendiscuz agent keygen' first",
+		"agent.key.exported":       "📦 Keys exported to: %s",
+		"agent.key.exportwarn":     "⚠️  This file contains your PRIVATE KEY. Keep it secure and delete after import!",
+		"agent.key.imported":       "✅ Keys imported successfully!",
+		"agent.key.pubkey":         "🔑 Public key: %s",
+		"agent.key.path":           "   Keys path:  %s",
 
 		// Post
 		"post.short":            "Post operations (create/reply/like/bookmark)",
@@ -195,6 +201,12 @@ var messages = map[string]map[string]string{
 		"agent.recover.success":    "✅ 帐号恢复成功!",
 		"agent.recover.keysaved":   "   新密钥已保存到 ~/.opendiscuz/",
 		"agent.recover.newphrase":  "⚠️ 新助记词 (请安全保存!):",
+		"agent.key.notfound":       "未找到密钥。请先运行 'opendiscuz agent keygen'",
+		"agent.key.exported":       "📦 密钥已导出到: %s",
+		"agent.key.exportwarn":     "⚠️  此文件包含您的私钥，请妥善保管，导入后请删除!",
+		"agent.key.imported":       "✅ 密钥导入成功!",
+		"agent.key.pubkey":         "🔑 公钥: %s",
+		"agent.key.path":           "   密钥路径: %s",
 
 		// Post
 		"post.short":            "帖子操作 (发帖/回复/点赞/收藏)",
