@@ -6,17 +6,18 @@ import (
 
 	"github.com/opendiscuz/opendiscuzcli/internal/api"
 	"github.com/opendiscuz/opendiscuzcli/internal/config"
+	"github.com/opendiscuz/opendiscuzcli/internal/i18n"
 	"github.com/spf13/cobra"
 )
 
 var authCmd = &cobra.Command{
 	Use:   "auth",
-	Short: "帐号认证 (注册/登录/退出)",
+	Short: "Account authentication (register/login/logout)",
 }
 
 var registerCmd = &cobra.Command{
 	Use:   "register",
-	Short: "创建新帐号",
+	Short: "Create a new account",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		username, _ := cmd.Flags().GetString("username")
 		email, _ := cmd.Flags().GetString("email")
@@ -36,7 +37,6 @@ var registerCmd = &cobra.Command{
 			return fmt.Errorf("register failed: %w", err)
 		}
 
-		// Save credentials
 		var data struct {
 			AccessToken  string `json:"access_token"`
 			RefreshToken string `json:"refresh_token"`
@@ -59,8 +59,8 @@ var registerCmd = &cobra.Command{
 		if jsonOutput {
 			printJSON(resp.DataJSON())
 		} else {
-			fmt.Printf("✅ 注册成功! 用户: %s (@%s)\n", data.User.DisplayName, data.User.Username)
-			fmt.Printf("   Token 已保存到 ~/.opendiscuz/credentials.json\n")
+			fmt.Printf(i18n.T("auth.register.success")+"\n", data.User.DisplayName, data.User.Username)
+			fmt.Println(i18n.T("auth.register.saved"))
 		}
 		return nil
 	},
@@ -68,7 +68,7 @@ var registerCmd = &cobra.Command{
 
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "登录已有帐号",
+	Short: "Login to existing account",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		email, _ := cmd.Flags().GetString("email")
 		password, _ := cmd.Flags().GetString("password")
@@ -93,8 +93,6 @@ var loginCmd = &cobra.Command{
 				ID          string `json:"id"`
 				Username    string `json:"username"`
 				DisplayName string `json:"display_name"`
-				UserType    string `json:"user_type"`
-				Verified    bool   `json:"verified"`
 			} `json:"user"`
 		}
 		json.Unmarshal(resp.Data, &data)
@@ -110,7 +108,7 @@ var loginCmd = &cobra.Command{
 		if jsonOutput {
 			printJSON(resp.DataJSON())
 		} else {
-			fmt.Printf("✅ 登录成功! 欢迎 %s (@%s)\n", data.User.DisplayName, data.User.Username)
+			fmt.Printf(i18n.T("auth.login.success")+"\n", data.User.DisplayName, data.User.Username)
 		}
 		return nil
 	},
@@ -118,13 +116,13 @@ var loginCmd = &cobra.Command{
 
 var logoutCmd = &cobra.Command{
 	Use:   "logout",
-	Short: "退出登录",
+	Short: "Logout",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		config.ClearCredentials()
 		if jsonOutput {
 			fmt.Println(`{"message":"logged out"}`)
 		} else {
-			fmt.Println("✅ 已退出登录")
+			fmt.Println(i18n.T("auth.logout.success"))
 		}
 		return nil
 	},
@@ -132,32 +130,32 @@ var logoutCmd = &cobra.Command{
 
 var whoamiCmd = &cobra.Command{
 	Use:   "whoami",
-	Short: "查看当前登录信息",
+	Short: "View current login info",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		creds := config.LoadCredentials()
 		if creds == nil {
-			return fmt.Errorf("未登录。请先运行 'opendiscuz auth login' 或设置 OPENDISCUZ_TOKEN")
+			return fmt.Errorf(i18n.T("auth.notlogged"))
 		}
 
 		if jsonOutput {
 			data, _ := json.MarshalIndent(creds, "", "  ")
 			fmt.Println(string(data))
 		} else {
-			fmt.Printf("用户: %s (@%s)\n", creds.DisplayName, creds.Username)
-			fmt.Printf("ID:   %s\n", creds.UserID)
-			fmt.Printf("API:  %s\n", config.GetAPIURL())
+			fmt.Printf(i18n.T("auth.whoami.user")+"\n", creds.DisplayName, creds.Username)
+			fmt.Printf(i18n.T("auth.whoami.id")+"\n", creds.UserID)
+			fmt.Printf(i18n.T("auth.whoami.api")+"\n", config.GetAPIURL())
 		}
 		return nil
 	},
 }
 
 func init() {
-	registerCmd.Flags().String("username", "", "用户名 (必填)")
-	registerCmd.Flags().String("email", "", "邮箱 (必填)")
-	registerCmd.Flags().String("password", "", "密码 (必填, 最少8位)")
+	registerCmd.Flags().String("username", "", "Username (required)")
+	registerCmd.Flags().String("email", "", "Email (required)")
+	registerCmd.Flags().String("password", "", "Password (required, min 8 chars)")
 
-	loginCmd.Flags().String("email", "", "邮箱 (必填)")
-	loginCmd.Flags().String("password", "", "密码 (必填)")
+	loginCmd.Flags().String("email", "", "Email (required)")
+	loginCmd.Flags().String("password", "", "Password (required)")
 
 	authCmd.AddCommand(registerCmd, loginCmd, logoutCmd, whoamiCmd)
 	rootCmd.AddCommand(authCmd)

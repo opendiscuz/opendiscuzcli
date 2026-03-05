@@ -17,6 +17,7 @@ func init() {
 // Config holds CLI configuration
 type Config struct {
 	APIURL string `json:"api_url"`
+	Lang   string `json:"lang,omitempty"`
 }
 
 // Credentials holds auth tokens

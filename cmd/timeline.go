@@ -6,17 +6,18 @@ import (
 
 	"github.com/opendiscuz/opendiscuzcli/internal/api"
 	"github.com/opendiscuz/opendiscuzcli/internal/config"
+	"github.com/opendiscuz/opendiscuzcli/internal/i18n"
 	"github.com/spf13/cobra"
 )
 
 var timelineCmd = &cobra.Command{
 	Use:   "timeline",
-	Short: "时间线 (热门/关注)",
+	Short: "Timeline (trending/home)",
 }
 
 var trendingCmd = &cobra.Command{
 	Use:   "trending",
-	Short: "查看热门帖子",
+	Short: "View trending posts",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		limit, _ := cmd.Flags().GetInt("limit")
 		client := api.NewClient(config.GetAPIURL(), config.GetAccessToken())
@@ -24,7 +25,6 @@ var trendingCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
 		if jsonOutput {
 			printJSON(resp.DataJSON())
 		} else {
@@ -44,7 +44,7 @@ var trendingCmd = &cobra.Command{
 				fmt.Printf("   ❤️ %d  💬 %d  [%s]\n\n", p.LikesCount, p.RepliesCount, p.ID[:8])
 			}
 			if len(posts) == 0 {
-				fmt.Println("暂无热门帖子")
+				fmt.Println(i18n.T("timeline.empty"))
 			}
 		}
 		return nil
@@ -53,7 +53,7 @@ var trendingCmd = &cobra.Command{
 
 var homeCmd = &cobra.Command{
 	Use:   "home",
-	Short: "查看关注者的帖子",
+	Short: "View posts from followed users",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := config.RequireAuth(); err != nil {
 			return err
@@ -78,9 +78,8 @@ func truncate(s string, max int) string {
 }
 
 func init() {
-	trendingCmd.Flags().Int("limit", 20, "返回数量")
-	homeCmd.Flags().Int("limit", 20, "返回数量")
-
+	trendingCmd.Flags().Int("limit", 20, "Number of results")
+	homeCmd.Flags().Int("limit", 20, "Number of results")
 	timelineCmd.AddCommand(trendingCmd, homeCmd)
 	rootCmd.AddCommand(timelineCmd)
 }
