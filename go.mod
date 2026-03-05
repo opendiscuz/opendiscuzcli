@@ -1,4 +1,4 @@
-module github.com/opendiscuz/opendiscuz/cli
+module github.com/opendiscuz/opendiscuzcli
 
 go 1.25.5
 

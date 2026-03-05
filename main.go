@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/opendiscuz/opendiscuz/cli/cmd"
+	"github.com/opendiscuz/opendiscuzcli/cmd"
 )
 
 func main() {
